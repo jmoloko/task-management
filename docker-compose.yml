@@ -1,0 +1,97 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+      - "9090:9090"
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_NAME=taskmanager
+      - DB_SSLMODE=disable
+      - JWT_SECRET=your-secret-key
+      - SERVER_PORT=8080
+      - SERVER_HOST=0.0.0.0
+      - SERVER_READ_TIMEOUT=10s
+      - SERVER_WRITE_TIMEOUT=10s
+      - LOG_LEVEL=info
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+    depends_on:
+      - db
+      - redis
+
+  db:
+    image: postgres:16
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=taskmanager
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    ports:
+      - "9091:9090"
+
+  grafana:
+    image: grafana/grafana:10.0.0
+    depends_on:
+      - prometheus
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+
+  node-exporter:
+    image: prom/node-exporter:v1.6.0
+    ports:
+      - "9100:9100"
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    environment:
+      - DATA_SOURCE_NAME=postgresql://postgres:postgres@db:5432/taskmanager?sslmode=disable
+    ports:
+      - "9187:9187"
+
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.55.0
+    environment:
+      - REDIS_ADDR=redis:6379
+    ports:
+      - "9121:9121"
+
+volumes:
+  postgres_data:
+  redis_data:
+  prometheus_data:
+  grafana_data: 
